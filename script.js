@@ -26,18 +26,16 @@ const hintImage = document.getElementById('hint-image');
 const stoneGame = document.getElementById('stone-game');
 const stoneContainer = document.getElementById('stone-container');
 const stoneScoreDisplay = document.getElementById('stone-score');
-const stoneTargetDisplay = document.getElementById('stone-target');
-const stoneStageDisplay = document.getElementById('stone-stage');
 const stoneRemainDisplay = document.getElementById('stone-remain');
+const stoneHighScoreDisplay = document.getElementById('stone-high-score');
 
-// Stone Match State
+// Stone Match State (4399 version)
 let stoneGrid = [];
-const stoneRows = 10;
-const stoneCols = 10;
-const stoneColors = ['red', 'blue', 'green', 'yellow', 'purple'];
+const stoneRows = 8;
+const stoneCols = 8;
 let stoneScore = 0;
-let stoneStage = 1;
-let stoneTarget = 1000;
+let stoneHighScore = localStorage.getItem('stoneHighScore') || 0;
+let draggedOperator = null;
 
 // --- Navigation ---
 function showMenu() {
@@ -45,7 +43,6 @@ function showMenu() {
     puzzleGame.classList.add('hidden');
     stoneGame.classList.add('hidden');
     successModal.classList.add('hidden');
-    puzzleGame.classList.remove('flex');
     stopTimer();
 }
 
@@ -301,123 +298,179 @@ function hideHint() {
     hintOverlay.classList.remove('flex');
 }
 
-// --- Stone Match Logic ---
+// --- Stone Match Logic (4399 version) ---
 function initStoneGame() {
     stoneScore = 0;
-    stoneStage = 1;
-    stoneTarget = 1000;
-    startNewStage();
-}
-
-function startNewStage() {
+    stoneHighScoreDisplay.innerText = stoneHighScore;
+    updateStoneStats();
+    
     stoneContainer.innerHTML = '';
     stoneContainer.style.gridTemplateColumns = `repeat(${stoneCols}, 1fr)`;
     stoneGrid = [];
-    
-    // Generate Grid
+
+    // Initialize grid with random numbers 1-6 (avoiding immediate matches)
     for (let r = 0; r < stoneRows; r++) {
         stoneGrid[r] = [];
         for (let c = 0; c < stoneCols; c++) {
-            const color = stoneColors[Math.floor(Math.random() * stoneColors.length)];
-            stoneGrid[r][c] = color;
+            let val;
+            do {
+                val = Math.floor(Math.random() * 6) + 1;
+            } while (isImmediateMatch(r, c, val));
+            stoneGrid[r][c] = val;
         }
     }
     
     renderStoneGrid();
-    updateStoneStats();
+    setupOperatorDrag();
+}
+
+function isImmediateMatch(r, c, val) {
+    if (c >= 2 && stoneGrid[r][c-1] === val && stoneGrid[r][c-2] === val) return true;
+    if (r >= 2 && stoneGrid[r-1][c] === val && stoneGrid[r-2][c] === val) return true;
+    return false;
 }
 
 function renderStoneGrid() {
     stoneContainer.innerHTML = '';
-    let remainCount = 0;
-    
     for (let r = 0; r < stoneRows; r++) {
         for (let c = 0; c < stoneCols; c++) {
             const stone = document.createElement('div');
-            const color = stoneGrid[r][c];
-            stone.className = `stone ${color ? 'stone-' + color : 'empty'}`;
+            const val = stoneGrid[r][c];
+            stone.className = `stone stone-n${val}`;
+            stone.innerText = val;
+            stone.dataset.row = r;
+            stone.dataset.col = c;
             
-            if (color) {
-                remainCount++;
-                stone.onclick = () => handleStoneClick(r, c);
-                stone.onmouseover = () => highlightGroup(r, c, true);
-                stone.onmouseout = () => highlightGroup(r, c, false);
-            }
+            // Drag and drop listeners for the stone (as a drop target)
+            stone.addEventListener('dragover', (e) => e.preventDefault());
+            stone.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                stone.classList.add('drag-over');
+            });
+            stone.addEventListener('dragleave', () => stone.classList.remove('drag-over'));
+            stone.addEventListener('drop', handleOperatorDrop);
+            
+            // Simple click to increment (as per some versions of the game)
+            stone.onclick = () => handleStoneClick(r, c);
             
             stoneContainer.appendChild(stone);
         }
     }
-    stoneRemainDisplay.innerText = remainCount;
+}
+
+function setupOperatorDrag() {
+    const operators = document.querySelectorAll('.operator-item');
+    operators.forEach(op => {
+        op.addEventListener('dragstart', (e) => {
+            draggedOperator = op.dataset.op;
+            op.classList.add('dragging');
+        });
+        op.addEventListener('dragend', () => {
+            op.classList.remove('dragging');
+            draggedOperator = null;
+        });
+    });
+}
+
+function handleOperatorDrop(e) {
+    e.preventDefault();
+    const stone = e.target.closest('.stone');
+    if (!stone || !draggedOperator) return;
+    
+    stone.classList.remove('drag-over');
+    const r = parseInt(stone.dataset.row);
+    const c = parseInt(stone.dataset.col);
+    
+    // Apply math
+    const opVal = parseInt(draggedOperator); // e.g., "+1" -> 1, "-1" -> -1
+    let newVal = stoneGrid[r][c] + opVal;
+    
+    // Keep between 1 and 9
+    if (newVal < 1) newVal = 1;
+    if (newVal > 9) newVal = 9;
+    
+    stoneGrid[r][c] = newVal;
+    checkAndEliminate();
 }
 
 function handleStoneClick(r, c) {
-    const color = stoneGrid[r][c];
-    if (!color) return;
+    // Basic click interaction: +1
+    let newVal = stoneGrid[r][c] + 1;
+    if (newVal > 9) newVal = 1;
+    stoneGrid[r][c] = newVal;
+    checkAndEliminate();
+}
 
-    const connected = findConnected(r, c, color);
-    if (connected.length < 2) return;
+function checkAndEliminate() {
+    let matches = findMatches();
+    if (matches.size > 0) {
+        eliminateMatches(matches);
+    } else {
+        renderStoneGrid();
+    }
+}
 
-    // Calculate Score: (n-1)^2 * 10
-    const points = Math.pow(connected.length - 1, 2) * 10;
-    stoneScore += points;
+function findMatches() {
+    const matches = new Set();
     
-    // Visual effect before removal
-    connected.forEach(([row, col]) => {
-        const index = row * stoneCols + col;
-        stoneContainer.children[index].classList.add('removing');
+    // Horizontal
+    for (let r = 0; r < stoneRows; r++) {
+        for (let c = 0; c < stoneCols - 2; c++) {
+            const val = stoneGrid[r][c];
+            if (val && stoneGrid[r][c+1] === val && stoneGrid[r][c+2] === val) {
+                matches.add(`${r},${c}`);
+                matches.add(`${r},${c+1}`);
+                matches.add(`${r},${c+2}`);
+            }
+        }
+    }
+    
+    // Vertical
+    for (let c = 0; c < stoneCols; c++) {
+        for (let r = 0; r < stoneRows - 2; r++) {
+            const val = stoneGrid[r][c];
+            if (val && stoneGrid[r+1][c] === val && stoneGrid[r+2][c] === val) {
+                matches.add(`${r},${c}`);
+                matches.add(`${r+1},${c}`);
+                matches.add(`${r+2},${c}`);
+            }
+        }
+    }
+    
+    return matches;
+}
+
+function eliminateMatches(matches) {
+    const matchArray = Array.from(matches).map(m => m.split(',').map(Number));
+    
+    // Add visual "matching" class
+    matchArray.forEach(([r, c]) => {
+        const index = r * stoneCols + c;
+        stoneContainer.children[index].classList.add('matching');
     });
 
+    // Score calculation
+    const points = matchArray.length * 100;
+    stoneScore += points;
+    updateStoneStats();
+
     setTimeout(() => {
-        connected.forEach(([row, col]) => {
-            stoneGrid[row][col] = null;
+        // Clear grid cells
+        matchArray.forEach(([r, c]) => {
+            stoneGrid[r][c] = null;
         });
         
         applyGravity();
-        shiftColumns();
-        renderStoneGrid();
-        updateStoneStats();
-        checkGameOver();
-    }, 200);
-}
-
-function findConnected(r, c, color) {
-    const connected = [];
-    const stack = [[r, c]];
-    const visited = new Set();
-
-    while (stack.length > 0) {
-        const [currR, currC] = stack.pop();
-        const key = `${currR},${currC}`;
-        if (visited.has(key)) continue;
-        visited.add(key);
-
-        if (stoneGrid[currR][currC] === color) {
-            connected.push([currR, currC]);
-            // Check neighbors
-            const neighbors = [[currR-1, currC], [currR+1, currC], [currR, currC-1], [currR, currC+1]];
-            neighbors.forEach(([nR, nC]) => {
-                if (nR >= 0 && nR < stoneRows && nC >= 0 && nC < stoneCols) {
-                    stack.push([nR, nC]);
-                }
-            });
+        fillEmptySpaces();
+        
+        // Check for cascades
+        const nextMatches = findMatches();
+        if (nextMatches.size > 0) {
+            eliminateMatches(nextMatches);
+        } else {
+            renderStoneGrid();
         }
-    }
-    return connected;
-}
-
-function highlightGroup(r, c, shouldHighlight) {
-    const color = stoneGrid[r][c];
-    if (!color) return;
-    
-    const connected = findConnected(r, c, color);
-    if (connected.length < 2) return;
-    
-    connected.forEach(([row, col]) => {
-        const index = row * stoneCols + col;
-        if (stoneContainer.children[index]) {
-            stoneContainer.children[index].classList.toggle('highlight', shouldHighlight);
-        }
-    });
+    }, 500);
 }
 
 function applyGravity() {
@@ -425,102 +478,34 @@ function applyGravity() {
         let emptyRow = stoneRows - 1;
         for (let r = stoneRows - 1; r >= 0; r--) {
             if (stoneGrid[r][c] !== null) {
-                const color = stoneGrid[r][c];
+                const val = stoneGrid[r][c];
                 stoneGrid[r][c] = null;
-                stoneGrid[emptyRow][c] = color;
+                stoneGrid[emptyRow][c] = val;
                 emptyRow--;
             }
         }
     }
 }
 
-function shiftColumns() {
-    let emptyCol = 0;
-    for (let c = 0; c < stoneCols; c++) {
-        let isColumnEmpty = true;
-        for (let r = 0; r < stoneRows; r++) {
-            if (stoneGrid[r][c] !== null) {
-                isColumnEmpty = false;
-                break;
+function fillEmptySpaces() {
+    for (let r = 0; r < stoneRows; r++) {
+        for (let c = 0; c < stoneCols; c++) {
+            if (stoneGrid[r][c] === null) {
+                stoneGrid[r][c] = Math.floor(Math.random() * 6) + 1;
             }
-        }
-
-        if (!isColumnEmpty) {
-            if (emptyCol !== c) {
-                for (let r = 0; r < stoneRows; r++) {
-                    stoneGrid[r][emptyCol] = stoneGrid[r][c];
-                    stoneGrid[r][c] = null;
-                }
-            }
-            emptyCol++;
         }
     }
 }
 
 function updateStoneStats() {
     stoneScoreDisplay.innerText = stoneScore;
-    stoneStageDisplay.innerText = stoneStage;
-    stoneTargetDisplay.innerText = stoneTarget;
-    
-    // Add visual feedback if target reached
-    if (stoneScore >= stoneTarget) {
-        stoneScoreDisplay.classList.add('text-green-600');
-    } else {
-        stoneScoreDisplay.classList.remove('text-green-600');
+    if (stoneScore > stoneHighScore) {
+        stoneHighScore = stoneScore;
+        localStorage.setItem('stoneHighScore', stoneHighScore);
+        stoneHighScoreDisplay.innerText = stoneHighScore;
     }
-}
-
-function checkGameOver() {
-    let hasMove = false;
-    for (let r = 0; r < stoneRows; r++) {
-        for (let c = 0; c < stoneCols; c++) {
-            const color = stoneGrid[r][c];
-            if (color) {
-                const neighbors = [[r-1, c], [r+1, c], [r, c-1], [r, c+1]];
-                for (const [nR, nC] of neighbors) {
-                    if (nR >= 0 && nR < stoneRows && nC >= 0 && nC < stoneCols && stoneGrid[nR][nC] === color) {
-                        hasMove = true;
-                        break;
-                    }
-                }
-            }
-            if (hasMove) break;
-        }
-        if (hasMove) break;
-    }
-
-    if (!hasMove) {
-        handleGameOver();
-    }
-}
-
-function handleGameOver() {
-    const remain = parseInt(stoneRemainDisplay.innerText);
-    let bonus = 0;
-    
-    // Original-style bonus for remaining stones
-    if (remain < 10) {
-        bonus = 2000 - (remain * 200);
-        if (remain === 0) bonus = 5000; // Jackpot
-    }
-    
-    if (bonus > 0) {
-        stoneScore += bonus;
-        updateStoneStats();
-        alert(`没有可以消除的石头了！\n剩余石头: ${remain}\n获得额外奖分: ${bonus}`);
-    } else {
-        alert(`没有可以消除的石头了！\n剩余石头: ${remain}\n没有额外奖励。`);
-    }
-
-    if (stoneScore >= stoneTarget) {
-        stoneStage++;
-        stoneTarget += 2000;
-        alert(`恭喜过关！即将开始第 ${stoneStage} 关。\n目标分数: ${stoneTarget}`);
-        startNewStage();
-    } else {
-        alert(`得分未达标，游戏结束！\n最终得分: ${stoneScore}`);
-        initStoneGame();
-    }
+    // Update total eliminated count (optional, can be number of matches)
+    stoneRemainDisplay.innerText = Math.floor(stoneScore / 100);
 }
 
 // --- Utilities ---
