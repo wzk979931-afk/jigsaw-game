@@ -599,7 +599,7 @@
             renderBoard();
             await delay(200);
             const newMatches = findMatches();
-            if (newMatches.length > 0 && Math.random() < 0.1) {
+            if (newMatches.length > 0) {
                 isProcessing = false;
                 processMatches(newMatches[0]);
             } else {
