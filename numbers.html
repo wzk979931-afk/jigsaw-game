@@ -217,13 +217,108 @@
             0% { transform: translateY(0) scale(1); opacity: 1; }
             100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
         }
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .header h1 {
+                font-size: 24px;
+                margin-top: 60px;
+            }
+            .back-btn {
+                top: 10px;
+                left: 10px;
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+            .stats-panel {
+                padding: 15px;
+                gap: 10px;
+            }
+            .stat-item .value {
+                font-size: 24px;
+            }
+            .game-container {
+                padding: 15px;
+            }
+            .game-board {
+                max-width: 90vw;
+                gap: 8px;
+            }
+            .stone {
+                font-size: 20px;
+                border-radius: 12px;
+            }
+            .tools-panel {
+                padding: 15px;
+            }
+            .tools-panel h3 {
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+            .tools {
+                gap: 10px;
+            }
+            .tool {
+                width: 50px;
+                height: 50px;
+                font-size: 24px;
+            }
+            .controls {
+                margin-top: 15px;
+            }
+            .controls button {
+                padding: 10px 25px;
+                font-size: 14px;
+                margin: 0 5px;
+            }
+            .instructions {
+                padding: 15px;
+                margin-top: 15px;
+            }
+            .instructions h3 {
+                font-size: 16px;
+            }
+            .instructions ul {
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        }
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 20px;
+            }
+            .stats-panel {
+                flex-direction: column;
+                align-items: center;
+            }
+            .stat-item {
+                width: 100%;
+            }
+            .game-board {
+                gap: 6px;
+            }
             .stone {
                 font-size: 18px;
                 border-radius: 10px;
             }
-            .game-board {
-                gap: 5px;
+            .tools {
+                flex-direction: column;
+                align-items: center;
+            }
+            .tool {
+                width: 60px;
+                height: 60px;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            .controls button {
+                width: 80%;
+                max-width: 200px;
+                margin: 0;
             }
         }
     </style>
@@ -312,6 +407,10 @@
         function getRandomNumber() {
             return Math.floor(Math.random() * 7) - 2;
         }
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchDragging = false;
+        let touchTarget = null;
         function renderBoard() {
             gameBoard.innerHTML = '';
             for (let row = 0; row < BOARD_SIZE; row++) {
@@ -337,6 +436,18 @@
                     cell.addEventListener('drop', (e) => handleDrop(e, row, col));
                     cell.addEventListener('dragenter', () => cell.classList.add('highlight'));
                     cell.addEventListener('dragleave', () => cell.classList.remove('highlight'));
+                    cell.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        handleStoneClick(row, col);
+                    });
+                    cell.addEventListener('dragover', (e) => e.preventDefault());
+                    cell.addEventListener('touchmove', (e) => e.preventDefault());
+                    cell.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        if (draggedType === 'operator') {
+                            handleDrop(e, row, col);
+                        }
+                    });
                     gameBoard.appendChild(cell);
                 }
             }
@@ -360,6 +471,19 @@
                     tool.classList.remove('dragging');
                     draggedType = null;
                     draggedValue = null;
+                });
+                tool.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    draggedType = 'operator';
+                    draggedValue = op;
+                    tool.classList.add('dragging');
+                });
+                tool.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                });
+                tool.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    tool.classList.remove('dragging');
                 });
                 toolsPanel.appendChild(tool);
             });
