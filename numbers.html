@@ -422,7 +422,17 @@
             renderBoard();
             renderTools();
         }
-        function getRandomNumber() {
+        function getRandomNumber(aroundNumbers = []) {
+            if (aroundNumbers.length > 0 && Math.random() < 0.6) {
+                const mostCommon = aroundNumbers.reduce((acc, num) => {
+                    acc[num] = (acc[num] || 0) + 1;
+                    return acc;
+                }, {});
+                const sorted = Object.entries(mostCommon).sort((a, b) => b[1] - a[1]);
+                if (sorted.length > 0) {
+                    return parseInt(sorted[0][0]);
+                }
+            }
             return Math.floor(Math.random() * 7) - 2;
         }
         let touchStartX = 0;
@@ -581,10 +591,14 @@
             if (isProcessing) return;
             isProcessing = true;
             combo++;
-            const points = match.length * 10 * combo;
+            const comboMultiplier = Math.pow(1.5, combo - 1);
+            const points = Math.floor(match.length * 10 * combo * comboMultiplier);
             score += points;
             removeCount++;
             showScorePopup(points, match[0]);
+            if (combo >= 3) {
+                showComboPopup(combo, match[0]);
+            }
             updateStats();
             match.forEach(pos => {
                 const cell = gameBoard.children[pos.row * BOARD_SIZE + pos.col];
@@ -608,6 +622,19 @@
                 isProcessing = false;
             }
         }
+        function showComboPopup(combo, pos) {
+            const cell = gameBoard.children[pos.row * BOARD_SIZE + pos.col];
+            const rect = cell.getBoundingClientRect();
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = `COMBO x${combo}!`;
+            popup.style.left = `${rect.left + rect.width / 2}px`;
+            popup.style.top = `${rect.top - 30}px`;
+            popup.style.color = '#ff6b6b';
+            popup.style.fontSize = '20px';
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 1000);
+        }
         async function dropStones() {
             for (let col = 0; col < BOARD_SIZE; col++) {
                 let emptyRow = BOARD_SIZE - 1;
@@ -626,7 +653,24 @@
             for (let col = 0; col < BOARD_SIZE; col++) {
                 for (let row = 0; row < BOARD_SIZE; row++) {
                     if (board[row][col] === null) {
-                        board[row][col] = getRandomNumber();
+                        const aroundNumbers = [];
+                        const directions = [
+                            {r: -1, c: 0},
+                            {r: 1, c: 0},
+                            {r: 0, c: -1},
+                            {r: 0, c: 1}
+                        ];
+                        directions.forEach(dir => {
+                            const newRow = row + dir.r;
+                            const newCol = col + dir.c;
+                            if (newRow >= 0 && newRow < BOARD_SIZE && newCol >= 0 && newCol < BOARD_SIZE) {
+                                const value = board[newRow][newCol];
+                                if (typeof value === 'number') {
+                                    aroundNumbers.push(value);
+                                }
+                            }
+                        });
+                        board[row][col] = getRandomNumber(aroundNumbers);
                     }
                 }
             }
