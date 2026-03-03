@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字消消乐 - 防彦美老年痴呆训练</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            min-height: 100vh;
+            padding: 20px;
+            user-select: none;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            color: white;
+            font-size: 32px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            color: #4facfe;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            transform: scale(1.05);
+        }
+        .stats-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-item label {
+            display: block;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .stat-item .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4facfe;
+        }
+        .game-container {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .stone {
+            aspect-ratio: 1;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .stone:hover {
+            transform: scale(1.05);
+        }
+        .stone.dragging {
+            opacity: 0.5;
+            transform: scale(1.1);
+        }
+        .stone.highlight {
+            animation: pulse 0.5s infinite;
+        }
+        .stone.removing {
+            animation: remove 0.3s forwards;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        @keyframes remove {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .stone.num-minus-2 { background: linear-gradient(135deg, #2c3e50, #34495e); }
+        .stone.num-minus-1 { background: linear-gradient(135deg, #7f8c8d, #95a5a6); }
+        .stone.num-0 { background: linear-gradient(135deg, #bdc3c7, #ecf0f1); color: #333; }
+        .stone.num-1 { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+        .stone.num-2 { background: linear-gradient(135deg, #ffa502, #ff7f50); }
+        .stone.num-3 { background: linear-gradient(135deg, #ffd93d, #f39c12); }
+        .stone.num-4 { background: linear-gradient(135deg, #6bcb77, #2ecc71); }
+        .stone.operator {
+            background: linear-gradient(135deg, #2d3436, #636e72);
+            font-size: 28px;
+        }
+        .tools-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .tools-panel h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .tools {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .tool {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            cursor: grab;
+            background: linear-gradient(135deg, #2d3436, #636e72);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+        .tool:hover {
+            transform: scale(1.1);
+        }
+        .tool:active {
+            cursor: grabbing;
+        }
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .controls button {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            margin: 0 10px;
+        }
+        .controls button:hover {
+            transform: scale(1.05);
+        }
+        .instructions {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .instructions ul {
+            color: #666;
+            line-height: 1.8;
+            padding-left: 20px;
+        }
+        .score-popup {
+            position: fixed;
+            pointer-events: none;
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffd93d;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            animation: scoreFloat 1s forwards;
+            z-index: 1000;
+        }
+        @keyframes scoreFloat {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+        @media (max-width: 600px) {
+            .stone {
+                font-size: 18px;
+                border-radius: 10px;
+            }
+            .game-board {
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← 返回主页</a>
+    <div class="container">
+        <div class="header">
+            <h1>🔢 数字消消乐</h1>
+        </div>
+        <div class="stats-panel">
+            <div class="stat-item">
+                <label>分数</label>
+                <div class="value" id="scoreDisplay">0</div>
+            </div>
+            <div class="stat-item">
+                <label>连击</label>
+                <div class="value" id="comboDisplay">0</div>
+            </div>
+            <div class="stat-item">
+                <label>消除次数</label>
+                <div class="value" id="removeDisplay">0</div>
+            </div>
+        </div>
+        <div class="game-container">
+            <div class="game-board" id="gameBoard"></div>
+            <div class="tools-panel">
+                <h3>🧰 道具栏（拖动到石头上使用）</h3>
+                <div class="tools" id="toolsPanel"></div>
+            </div>
+            <div class="controls">
+                <button id="restartBtn">重新开始</button>
+                <button id="hintBtn">💡 提示</button>
+            </div>
+        </div>
+        <div class="instructions">
+            <h3>📖 游戏说明</h3>
+            <ul>
+                <li><strong>目标：</strong>3个或以上相同数字的石头连成一片即可消除</li>
+                <li><strong>操作：</strong>点击石头可以直接消除（需满足消除条件）</li>
+                <li><strong>道具：</strong>拖动加减符号到石头上，可以改变石头数字</li>
+                <li><strong>技巧：</strong>先观察全局，巧用符号创造更多消除机会</li>
+            </ul>
+        </div>
+    </div>
+    <script>
+        const BOARD_SIZE = 5;
+        const MIN_MATCH = 3;
+        let board = [];
+        let score = 0;
+        let combo = 0;
+        let removeCount = 0;
+        let isProcessing = false;
+        const gameBoard = document.getElementById('gameBoard');
+        const toolsPanel = document.getElementById('toolsPanel');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const comboDisplay = document.getElementById('comboDisplay');
+        const removeDisplay = document.getElementById('removeDisplay');
+        const restartBtn = document.getElementById('restartBtn');
+        const hintBtn = document.getElementById('hintBtn');
+        let draggedItem = null;
+        let draggedType = null;
+        let draggedValue = null;
+        function initGame() {
+            board = [];
+            score = 0;
+            combo = 0;
+            removeCount = 0;
+            updateStats();
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                board[row] = [];
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    board[row][col] = getRandomNumber();
+                }
+            }
+            while (findMatches().length > 0) {
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    for (let col = 0; col < BOARD_SIZE; col++) {
+                        board[row][col] = getRandomNumber();
+                    }
+                }
+            }
+            renderBoard();
+            renderTools();
+        }
+        function getRandomNumber() {
+            return Math.floor(Math.random() * 7) - 2;
+        }
+        function renderBoard() {
+            gameBoard.innerHTML = '';
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'stone';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    const value = board[row][col];
+                    if (typeof value === 'number') {
+                        if (value < 0) {
+                            cell.classList.add(`num-minus-${Math.abs(value)}`);
+                        } else {
+                            cell.classList.add(`num-${value}`);
+                        }
+                        cell.textContent = value;
+                    } else {
+                        cell.classList.add('operator');
+                        cell.textContent = value;
+                    }
+                    cell.addEventListener('click', () => handleStoneClick(row, col));
+                    cell.addEventListener('dragover', (e) => e.preventDefault());
+                    cell.addEventListener('drop', (e) => handleDrop(e, row, col));
+                    cell.addEventListener('dragenter', () => cell.classList.add('highlight'));
+                    cell.addEventListener('dragleave', () => cell.classList.remove('highlight'));
+                    gameBoard.appendChild(cell);
+                }
+            }
+        }
+        function renderTools() {
+            toolsPanel.innerHTML = '';
+            const allOperators = ['+1', '+2', '-1', '-2'];
+            const shuffled = [...allOperators].sort(() => Math.random() - 0.5);
+            const selectedOperators = shuffled.slice(0, 4);
+            selectedOperators.forEach(op => {
+                const tool = document.createElement('div');
+                tool.className = 'tool';
+                tool.draggable = true;
+                tool.textContent = op;
+                tool.addEventListener('dragstart', (e) => {
+                    draggedType = 'operator';
+                    draggedValue = op;
+                    tool.classList.add('dragging');
+                });
+                tool.addEventListener('dragend', () => {
+                    tool.classList.remove('dragging');
+                    draggedType = null;
+                    draggedValue = null;
+                });
+                toolsPanel.appendChild(tool);
+            });
+        }
+        function handleStoneClick(row, col) {
+            if (isProcessing) return;
+            const matches = findMatches();
+            const clickedMatch = matches.find(match => 
+                match.some(pos => pos.row === row && pos.col === col)
+            );
+            if (clickedMatch) {
+                processMatches(clickedMatch);
+            }
+        }
+        function handleDrop(e, row, col) {
+            e.preventDefault();
+            if (isProcessing) return;
+            const cell = gameBoard.children[row * BOARD_SIZE + col];
+            cell.classList.remove('highlight');
+            if (draggedType === 'operator' && typeof board[row][col] === 'number') {
+                applyOperator(row, col, draggedValue);
+            }
+        }
+        function applyOperator(row, col, operator) {
+            const value = board[row][col];
+            let newValue;
+            switch (operator) {
+                case '+1': newValue = value + 1; break;
+                case '+2': newValue = value + 2; break;
+                case '-1': newValue = value - 1; break;
+                case '-2': newValue = value - 2; break;
+            }
+            newValue = Math.max(-2, Math.min(4, newValue));
+            board[row][col] = newValue;
+            renderBoard();
+            renderTools();
+            combo = 0;
+            updateStats();
+            const matches = findMatches();
+            if (matches.length > 0) {
+                setTimeout(() => processMatches(matches[0]), 300);
+            }
+        }
+        function findMatches() {
+            const matches = [];
+            const checked = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(false));
+            for (let row = 0; row < BOARD_SIZE; row++) {
+                for (let col = 0; col < BOARD_SIZE; col++) {
+                    if (!checked[row][col] && typeof board[row][col] === 'number') {
+                        const group = [];
+                        const value = board[row][col];
+                        const stack = [{row, col}];
+                        while (stack.length > 0) {
+                            const pos = stack.pop();
+                            if (pos.row < 0 || pos.row >= BOARD_SIZE || 
+                                pos.col < 0 || pos.col >= BOARD_SIZE ||
+                                checked[pos.row][pos.col] || 
+                                board[pos.row][pos.col] !== value) {
+                                continue;
+                            }
+                            checked[pos.row][pos.col] = true;
+                            group.push(pos);
+                            stack.push({row: pos.row - 1, col: pos.col});
+                            stack.push({row: pos.row + 1, col: pos.col});
+                            stack.push({row: pos.row, col: pos.col - 1});
+                            stack.push({row: pos.row, col: pos.col + 1});
+                        }
+                        if (group.length >= MIN_MATCH) {
+                            matches.push(group);
+                        }
+                    }
+                }
+            }
+            return matches;
+        }
+        async function processMatches(match) {
+            if (isProcessing) return;
+            isProcessing = true;
+            combo++;
+            const points = match.length * 10 * combo;
+            score += points;
+            removeCount++;
+            showScorePopup(points, match[0]);
+            updateStats();
+            match.forEach(pos => {
+                const cell = gameBoard.children[pos.row * BOARD_SIZE + pos.col];
+                cell.classList.add('removing');
+            });
+            await delay(300);
+            match.forEach(pos => {
+                board[pos.row][pos.col] = null;
+            });
+            await dropStones();
+            await fillEmptySpaces();
+            renderBoard();
+            await delay(200);
+            const newMatches = findMatches();
+            if (newMatches.length > 0 && Math.random() < 0.1) {
+                isProcessing = false;
+                processMatches(newMatches[0]);
+            } else {
+                combo = 0;
+                updateStats();
+                isProcessing = false;
+            }
+        }
+        async function dropStones() {
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                let emptyRow = BOARD_SIZE - 1;
+                for (let row = BOARD_SIZE - 1; row >= 0; row--) {
+                    if (board[row][col] !== null) {
+                        if (row !== emptyRow) {
+                            board[emptyRow][col] = board[row][col];
+                            board[row][col] = null;
+                        }
+                        emptyRow--;
+                    }
+                }
+            }
+        }
+        async function fillEmptySpaces() {
+            for (let col = 0; col < BOARD_SIZE; col++) {
+                for (let row = 0; row < BOARD_SIZE; row++) {
+                    if (board[row][col] === null) {
+                        board[row][col] = getRandomNumber();
+                    }
+                }
+            }
+        }
+        function showScorePopup(points, pos) {
+            const cell = gameBoard.children[pos.row * BOARD_SIZE + pos.col];
+            const rect = cell.getBoundingClientRect();
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = `+${points}`;
+            popup.style.left = `${rect.left + rect.width / 2}px`;
+            popup.style.top = `${rect.top}px`;
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 1000);
+        }
+        function updateStats() {
+            scoreDisplay.textContent = score;
+            comboDisplay.textContent = combo;
+            removeDisplay.textContent = removeCount;
+        }
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        restartBtn.addEventListener('click', initGame);
+        hintBtn.addEventListener('click', () => {
+            if (isProcessing) return;
+            const matches = findMatches();
+            if (matches.length > 0) {
+                matches[0].forEach(pos => {
+                    const cell = gameBoard.children[pos.row * BOARD_SIZE + pos.col];
+                    cell.classList.add('highlight');
+                    setTimeout(() => cell.classList.remove('highlight'), 1500);
+                });
+            } else {
+                alert('没有可消除的组合，试试用道具调整数字吧！');
+            }
+        });
+        initGame();
+    </script>
+</body>
+</html>
